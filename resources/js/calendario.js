@@ -2,6 +2,7 @@ import { Calendar } from 'fullcalendar';
 import dayGridPlugin from 'fullcalendar/daygrid';
 import timeGridPlugin from 'fullcalendar/timegrid';
 import interactionPlugin from 'fullcalendar/interaction';
+import classicThemePlugin from 'fullcalendar/themes/classic';
 import esLocale from 'fullcalendar/locales/es';
 import 'fullcalendar/skeleton.css';
 import 'fullcalendar/themes/classic/theme.css';
@@ -84,6 +85,7 @@ const aEvento = (cita) => ({
     start: `${cita.fecha}T${cita.hora_inicio}`,
     end: `${cita.fecha}T${cita.hora_fin}`,
     allDay: false,
+    className: `cita-${cita.estado}`,
     backgroundColor: COLORES_ESTADO[cita.estado] ?? '#6b7280',
     borderColor: COLORES_ESTADO[cita.estado] ?? '#6b7280',
     extendedProps: { cita },
@@ -224,7 +226,7 @@ async function reprogramar(info) {
 }
 
 const calendario = new Calendar($('calendario'), {
-    plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+    plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin, classicThemePlugin],
     locale: esLocale,
     initialView: 'dayGridMonth',
     headerToolbar: {
@@ -233,7 +235,8 @@ const calendario = new Calendar($('calendario'), {
         right: 'dayGridMonth,timeGridWeek',
     },
     height: 'auto',
-    dayMaxEvents: true,
+    dayMaxEventRows: 4,
+    moreLinkClick: 'popover',
     weekends: true,
     selectable: true,
     editable: true,
