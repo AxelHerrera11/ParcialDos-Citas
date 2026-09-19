@@ -9,3 +9,32 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+.fc .cita-pendiente {
+    --fc-event-color: #f59e0b !important;
+    --fc-event-contrast-color: #ffffff !important;
+}
+
+.fc .cita-confirmada {
+    --fc-event-color: #3b82f6 !important;
+    --fc-event-contrast-color: #ffffff !important;
+}
+
+.fc .cita-cancelada {
+    --fc-event-color: #ef4444 !important;
+    --fc-event-contrast-color: #ffffff !important;
+    text-decoration: line-through;
+}
+
+.fc .cita-atendida {
+    --fc-event-color: #10b981 !important;
+    --fc-event-contrast-color: #ffffff !important;
+}
+
+.fc .cita-pendiente:hover,
+.fc .cita-confirmada:hover,
+.fc .cita-cancelada:hover,
+.fc .cita-atendida:hover {
+    filter: brightness(0.92);
+    cursor: pointer;
+}
