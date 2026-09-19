@@ -8,12 +8,15 @@ use Tests\TestCase;
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * RQF-02: la raíz redirige al dashboard del calendario.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_la_raiz_redirige_al_dashboard(): void
     {
-        $response = $this->get('/');
+        $this->get('/')->assertRedirect('/dashboard');
+    }
 
-        $response->assertStatus(200);
+    public function test_el_dashboard_responde_ok(): void
+    {
+        $this->get('/dashboard')->assertOk();
     }
 }
