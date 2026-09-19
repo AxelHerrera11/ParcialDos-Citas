@@ -198,6 +198,31 @@ async function cambiarEstado(estado) {
     calendario.refetchEvents();
 }
 
+async function reprogramar(info) {
+    const inicio = info.event.start;
+    const fin = info.event.end ?? new Date(inicio.getTime() + 60 * 60 * 1000);
+
+    const res = await fetch(`/api/citas/${info.event.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fecha: aFecha(inicio),
+            hora_inicio: aHora(inicio),
+            hora_fin: aHora(fin),
+        }),
+    });
+    const body = await res.json();
+
+    if (!res.ok) {
+        info.revert();
+        notificar(errores(body), 'error');
+        return;
+    }
+
+    notificar('Cita reprogramada correctamente');
+    calendario.refetchEvents();
+}
+
 const calendario = new Calendar($('calendario'), {
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
     locale: esLocale,
@@ -211,10 +236,14 @@ const calendario = new Calendar($('calendario'), {
     dayMaxEvents: true,
     weekends: true,
     selectable: true,
+    editable: true,
+    eventResizableFromStart: false,
     events: cargarEventos,
     eventDisplay: 'block',
     dateClick: abrirModalCrear,
     eventClick: abrirModalDetalle,
+    eventDrop: reprogramar,
+    eventResize: reprogramar,
 });
 
 $('filtroDoctor').addEventListener('change', () => calendario.refetchEvents());
