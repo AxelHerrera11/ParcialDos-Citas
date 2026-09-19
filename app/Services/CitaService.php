@@ -32,6 +32,7 @@ class CitaService
 
         return $cita->refresh()->load(['paciente', 'doctor']);
     }
+
     public function list(array $filtros): Collection
     {
         $query = Cita::query()
@@ -56,18 +57,6 @@ class CitaService
         }
 
         return $query->get();
-    }
-
-    public function create(array $datos): Cita
-    {
-        return Cita::create($datos);
-    }
-
-    public function update(Cita $cita, array $datos): Cita
-    {
-        $cita->update($datos);
-
-        return $cita->refresh()->load(['paciente', 'doctor']);
     }
 
     public function changeEstado(Cita $cita, string $estado): Cita

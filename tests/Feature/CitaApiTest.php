@@ -80,6 +80,139 @@ class CitaApiTest extends TestCase
             ->assertJsonStructure(['message', 'errors']);
     }
 
+    public function test_store_responde_409_ante_doble_reserva_del_mismo_doctor(): void
+    {
+        $doctor = Doctor::factory()->create();
+        $pacienteA = Paciente::factory()->create();
+        $pacienteB = Paciente::factory()->create();
+        $fecha = Carbon::tomorrow()->toDateString();
+
+        Cita::factory()->create([
+            'doctor_id' => $doctor->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'hora_fin' => '10:00',
+            'estado' => 'confirmada',
+        ]);
+
+        $this->postJson('/api/citas', [
+            'paciente_id' => $pacienteB->id,
+            'doctor_id' => $doctor->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '09:30',
+            'hora_fin' => '10:30',
+            'motivo' => 'Consulta urgente',
+        ])->assertStatus(409)
+            ->assertJsonPath('message', "El doctor {$doctor->nombre} ya tiene una cita en el horario 09:30 - 10:30 de {$fecha}.");
+
+        $this->assertDatabaseMissing('citas', ['motivo' => 'Consulta urgente']);
+    }
+
+    public function test_store_no_conflicto_con_horarios_adyacentes(): void
+    {
+        $doctor = Doctor::factory()->create();
+        $paciente = Paciente::factory()->create();
+        $fecha = Carbon::tomorrow()->toDateString();
+
+        Cita::factory()->create([
+            'doctor_id' => $doctor->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'hora_fin' => '10:00',
+        ]);
+
+        $this->postJson('/api/citas', [
+            'paciente_id' => $paciente->id,
+            'doctor_id' => $doctor->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '10:00',
+            'hora_fin' => '11:00',
+            'motivo' => 'Control de rutina',
+        ])->assertStatus(201);
+    }
+
+    public function test_store_no_conflicto_si_el_doctor_difiere(): void
+    {
+        $doctorA = Doctor::factory()->create();
+        $doctorB = Doctor::factory()->create();
+        $paciente = Paciente::factory()->create();
+        $fecha = Carbon::tomorrow()->toDateString();
+
+        Cita::factory()->create([
+            'doctor_id' => $doctorA->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'hora_fin' => '10:00',
+        ]);
+
+        $this->postJson('/api/citas', [
+            'paciente_id' => $paciente->id,
+            'doctor_id' => $doctorB->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'hora_fin' => '10:00',
+            'motivo' => 'Segundo doctor',
+        ])->assertStatus(201);
+    }
+
+    public function test_store_no_conflicto_con_cita_cancelada(): void
+    {
+        $doctor = Doctor::factory()->create();
+        $paciente = Paciente::factory()->create();
+        $fecha = Carbon::tomorrow()->toDateString();
+
+        Cita::factory()->create([
+            'doctor_id' => $doctor->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'hora_fin' => '10:00',
+            'estado' => 'cancelada',
+        ]);
+
+        $this->postJson('/api/citas', [
+            'paciente_id' => $paciente->id,
+            'doctor_id' => $doctor->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'hora_fin' => '10:00',
+            'motivo' => 'Luego de cancelada',
+        ])->assertStatus(201);
+    }
+
+    public function test_update_responde_409_si_reprograma_sobre_cita_existente(): void
+    {
+        $doctor = Doctor::factory()->create();
+        $fecha = Carbon::tomorrow()->toDateString();
+
+        $citaIda = Cita::factory()->create([
+            'doctor_id' => $doctor->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'hora_fin' => '10:00',
+        ]);
+
+        $citaAMover = Cita::factory()->create([
+            'doctor_id' => $doctor->id,
+            'fecha' => $fecha,
+            'hora_inicio' => '11:00',
+            'hora_fin' => '12:00',
+        ]);
+
+        $this->putJson("/api/citas/{$citaAMover->id}", [
+            'fecha' => $fecha,
+            'hora_inicio' => '09:30',
+            'hora_fin' => '10:30',
+        ])->assertStatus(409);
+
+        $this->assertDatabaseHas('citas', [
+            'id' => $citaAMover->id,
+            'hora_inicio' => '11:00',
+            'hora_fin' => '12:00',
+        ]);
+
+        $this->assertNotNull($citaIda);
+    }
+
     public function test_show_devuelve_detalle_y_404_si_no_existe(): void
     {
         $cita = Cita::factory()->create();
