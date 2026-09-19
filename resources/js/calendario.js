@@ -21,6 +21,63 @@ const aFecha = (d) =>
 
 const aHora = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
+const redondearHora = (d) => {
+    let hora = d.getHours();
+    let min = d.getMinutes();
+    if (min >= 30) {
+        hora += 1;
+        min = 0;
+    } else {
+        min = 30;
+    }
+    return `${String(hora % 24).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+};
+
+const sumarHora = (hora, minutos = 60) => {
+    const [h, m] = hora.split(':').map(Number);
+    const total = h * 60 + m + minutos;
+    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+};
+
+const errores = (body) => {
+    if (body.errors && Object.keys(body.errors).length) {
+        return Object.values(body.errors).flat().join(' · ');
+    }
+    return body.message ?? 'Ocurrió un error inesperado.';
+};
+
+function notificar(texto, tipo = 'success') {
+    const el = document.createElement('div');
+    el.className = `rounded-lg px-4 py-3 text-sm text-white shadow-lg ${
+        tipo === 'error' ? 'bg-red-600' : 'bg-emerald-600'
+    }`;
+    el.textContent = texto;
+    $('areaNotificacion').appendChild(el);
+    setTimeout(() => el.remove(), 5000);
+}
+
+function abrirModal(id) {
+    $(id).classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+}
+
+function cerrarModal(id) {
+    $(id).classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+}
+
+function abrirModalCrear(info) {
+    const form = $('formCrear');
+    form.reset();
+    $('crear_fecha').value = aFecha(info.date);
+    if (!info.allDay) {
+        const inicio = redondearHora(info.date);
+        $('crear_inicio').value = inicio;
+        $('crear_fin').value = sumarHora(inicio);
+    }
+    abrirModal('modalCrear');
+}
+
 const aEvento = (cita) => ({
     id: String(cita.id),
     title: cita.paciente ? `${cita.paciente.nombre} · ${cita.motivo}` : cita.motivo,
@@ -70,6 +127,77 @@ async function cargarCatalogos() {
     });
 }
 
+let detalleActual = null;
+
+async function crearCita(event) {
+    event.preventDefault();
+
+    const payload = {
+        paciente_id: Number($('crear_paciente').value),
+        doctor_id: Number($('crear_doctor').value),
+        fecha: $('crear_fecha').value,
+        hora_inicio: $('crear_inicio').value,
+        hora_fin: $('crear_fin').value,
+        motivo: $('crear_motivo').value,
+    };
+
+    const res = await fetch('/api/citas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    const body = await res.json();
+
+    if (!res.ok) {
+        notificar(errores(body), 'error');
+        return;
+    }
+
+    cerrarModal('modalCrear');
+    notificar('Cita creada correctamente');
+    calendario.refetchEvents();
+}
+
+function abrirModalDetalle(event) {
+    const cita = event.extendedProps.cita;
+    detalleActual = cita;
+
+    $('detalle_paciente').textContent = cita.paciente?.nombre ?? `Paciente #${cita.paciente_id}`;
+    $('detalle_doctor').textContent = cita.doctor?.nombre ?? `Doctor #${cita.doctor_id}`;
+    $('detalle_fecha').textContent = cita.fecha;
+    $('detalle_hora').textContent = `${cita.hora_inicio} - ${cita.hora_fin}`;
+    $('detalle_motivo').textContent = cita.motivo;
+
+    const badge = $('detalle_estado');
+    badge.textContent = cita.estado;
+    badge.style.backgroundColor = COLORES_ESTADO[cita.estado] ?? '#6b7280';
+
+    abrirModal('modalDetalle');
+}
+
+async function cambiarEstado(estado) {
+    if (!detalleActual) {
+        return;
+    }
+
+    const res = await fetch(`/api/citas/${detalleActual.id}/estado`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado }),
+    });
+    const body = await res.json();
+
+    if (!res.ok) {
+        notificar(errores(body), 'error');
+        return;
+    }
+
+    cerrarModal('modalDetalle');
+    detalleActual = null;
+    notificar(`Cita marcada como ${estado}`);
+    calendario.refetchEvents();
+}
+
 const calendario = new Calendar($('calendario'), {
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
     locale: esLocale,
@@ -82,8 +210,11 @@ const calendario = new Calendar($('calendario'), {
     height: 'auto',
     dayMaxEvents: true,
     weekends: true,
+    selectable: true,
     events: cargarEventos,
     eventDisplay: 'block',
+    dateClick: abrirModalCrear,
+    eventClick: abrirModalDetalle,
 });
 
 $('filtroDoctor').addEventListener('change', () => calendario.refetchEvents());
@@ -94,6 +225,27 @@ $('btnLimpiarFiltros').addEventListener('click', () => {
     $('filtroDesde').value = '';
     $('filtroHasta').value = '';
     calendario.refetchEvents();
+});
+
+$('formCrear').addEventListener('submit', crearCita);
+$('btnNuevaCita').addEventListener('click', () => {
+    $('formCrear').reset();
+    abrirModal('modalCrear');
+});
+
+document.querySelectorAll('[data-estado]').forEach((boton) => {
+    boton.addEventListener('click', () => cambiarEstado(boton.dataset.estado));
+});
+
+document.querySelectorAll('[data-cerrar]').forEach((elemento) => {
+    elemento.addEventListener('click', () => cerrarModal(elemento.dataset.cerrar));
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        cerrarModal('modalCrear');
+        cerrarModal('modalDetalle');
+    }
 });
 
 cargarCatalogos();
